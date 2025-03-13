@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Light Control</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-dark: #2980b9;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --gray: #6c757d;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            color: var(--dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+        }
+        
+        h2 {
+            color: var(--dark);
+            margin-top: 0;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            justify-content: center;
+        }
+        
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 0.8rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .btn-on {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .btn-on:hover {
+            background-color: #27ae60;
+        }
+        
+        .btn-off {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .btn-off:hover {
+            background-color: #c0392b;
+        }
+        
+        .status-panel {
+            background-color: var(--light);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .status-panel p {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+        
+        .connecting {
+            background-color: #f39c12;
+        }
+        
+        .connected {
+            background-color: var(--success);
+        }
+        
+        .disconnected {
+            background-color: var(--danger);
+        }
+        
+        .connection-status {
+            font-size: 0.9rem;
+            color: var(--gray);
+            margin-top: 0.5rem;
+        }
+        
+        .bulb-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+        
+        .status-text {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="bulb-icon">💡</div>
+        <h2>Light Control Panel</h2>
+        
+        <div class="button-group">
+            <button class="btn-on" onclick="sendCommand('ON')">
+                <span>ON</span>
+            </button>
+            <button class="btn-off" onclick="sendCommand('OFF')">
+                <span>OFF</span>
+            </button>
+        </div>
+        
+        <div class="status-panel">
+            <p>
+                <span>Status: </span>
+                <span id="status" class="status-text">Waiting for command...</span>
+            </p>
+            <p class="connection-status">
+                <span class="status-indicator" id="connection-indicator"></span>
+                <span id="connection-text">Connecting to broker...</span>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const broker = "wss://test.mosquitto.org:8081/mqtt"; // Public MQTT broker
+        const topic = "/student_group/light_control";
+        
+        const connectionIndicator = document.getElementById("connection-indicator");
+        const connectionText = document.getElementById("connection-text");
+        
+        // Set initial connection status
+        connectionIndicator.classList.add("connecting");
+        
+        const client = mqtt.connect(broker);
+
+        client.on("connect", () => {
+            console.log("Connected to MQTT broker");
+            connectionIndicator.className = "status-indicator connected";
+            connectionText.innerText = "Connected to broker";
+        });
+        
+        client.on("error", (error) => {
+            console.error("Connection error:", error);
+            connectionIndicator.className = "status-indicator disconnected";
+            connectionText.innerText = "Connection error";
+        });
+        
+        client.on("offline", () => {
+            console.log("Disconnected from broker");
+            connectionIndicator.className = "status-indicator disconnected";
+            connectionText.innerText = "Disconnected from broker";
+        });
+        
+        client.on("reconnect", () => {
+            console.log("Reconnecting to broker");
+            connectionIndicator.className = "status-indicator connecting";
+            connectionText.innerText = "Reconnecting to broker...";
+        });
+
+        function sendCommand(command) {
+            if (!client.connected) {
+                alert("Not connected to broker. Please wait for connection to establish.");
+                return;
+            }
+            
+            client.publish(topic, command);
+            const statusElement = document.getElementById("status");
+            statusElement.innerText = command === "ON" ? "Light is ON" : "Light is OFF";
+            
+            // Visual feedback
+            document.body.style.backgroundColor = command === "ON" ? "#fcf8e3" : "#f4f6f8";
+            
+            // Add button animation
+            const button = command === "ON" ? document.querySelector(".btn-on") : document.querySelector(".btn-off");
+            button.style.transform = "scale(0.95)";
+            setTimeout(() => {
+                button.style.transform = "";
+            }, 200);
+        }
+    </script>
+</body>
+</html>
